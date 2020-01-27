@@ -412,6 +412,7 @@ checktick()
 
 
 
+#ifndef USE_CLOCK_GETTIME
 /* A gettimeofday routine to give access to the wall
    clock timer on most UNIX-like systems.  */
 
@@ -426,6 +427,15 @@ double mysecond()
     i = gettimeofday(&tp,&tzp);
     return ( (double) tp.tv_sec + (double) tp.tv_usec * 1.e-6 );
 }
+#else
+#include <time.h>
+double mysecond()
+{
+  struct timespec t;
+  clock_gettime(CLOCK_MONOTONIC, &t);
+  return ( (double) t.tv_sec + (double) t.tv_nsec * 1.e-9 );
+}
+#endif
 
 #ifndef abs
 #define abs(a) ((a) >= 0 ? (a) : -(a))
