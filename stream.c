@@ -176,17 +176,22 @@
 #define STREAM_TYPE double
 #endif
 
+#ifndef NUM_KERNELS
+#define NUM_KERNELS 4
+#endif
+
 static STREAM_TYPE	a[STREAM_ARRAY_SIZE+OFFSET],
     b[STREAM_ARRAY_SIZE+OFFSET],
     c[STREAM_ARRAY_SIZE+OFFSET];
 
-static double	avgtime[4] = {0}, maxtime[4] = {0},
-    mintime[4] = {FLT_MAX,FLT_MAX,FLT_MAX,FLT_MAX};
+static double	avgtime[NUM_KERNELS] = {0}, maxtime[NUM_KERNELS] = {0},
+    mintime[NUM_KERNELS] = {FLT_MAX,FLT_MAX,FLT_MAX,FLT_MAX};
 
-static char	*label[4] = {"Copy:      ", "Scale:     ",
-                             "Add:       ", "Triad:     "};
+static char	*label[NUM_KERNELS] = {
+    "Copy:      ", "Scale:     ",
+    "Add:       ", "Triad:     "};
 
-static double	bytes[4] = {
+static double	bytes[NUM_KERNELS] = {
     2 * sizeof(STREAM_TYPE) * STREAM_ARRAY_SIZE,
     2 * sizeof(STREAM_TYPE) * STREAM_ARRAY_SIZE,
     3 * sizeof(STREAM_TYPE) * STREAM_ARRAY_SIZE,
@@ -212,7 +217,7 @@ main()
     int			k;
     ssize_t		j;
     STREAM_TYPE		scalar;
-    double		t, times[4][NTIMES];
+    double		t, times[NUM_KERNELS][NTIMES];
 
     /* --- SETUP --- determine precision and check timing --- */
 
@@ -351,7 +356,7 @@ main()
 
     for (k=1; k<NTIMES; k++) /* note -- skip first iteration */
     {
-        for (j=0; j<4; j++)
+        for (j=0; j<NUM_KERNELS; j++)
         {
             avgtime[j] = avgtime[j] + times[j][k];
             mintime[j] = MIN(mintime[j], times[j][k]);
@@ -360,7 +365,7 @@ main()
     }
 
     printf("Function    Best Rate MB/s  Avg time     Min time     Max time\n");
-    for (j=0; j<4; j++) {
+    for (j=0; j<NUM_KERNELS; j++) {
         avgtime[j] = avgtime[j]/(double)(NTIMES-1);
 
         printf("%s%12.1f  %11.6f  %11.6f  %11.6f\n", label[j],
