@@ -231,13 +231,11 @@ static double	bytes[NUM_KERNELS] = {
     3 * sizeof(STREAM_TYPE) * STREAM_ARRAY_SIZE,
     3 * sizeof(STREAM_TYPE) * STREAM_ARRAY_SIZE,
 #ifdef ENABLE_GATHER
-    sizeof(STREAM_TYPE) * MIN(STREAM_ARRAY_SIZE, STREAM_INDEX_ARRAY_SIZE) +
-    sizeof(STREAM_TYPE) * STREAM_INDEX_ARRAY_SIZE +
+    2 * sizeof(STREAM_TYPE) * STREAM_INDEX_ARRAY_SIZE +
     sizeof(INDEX_TYPE) * STREAM_INDEX_ARRAY_SIZE,
 #endif
 #ifdef ENABLE_SCATTER
-    sizeof(STREAM_TYPE) * MIN(STREAM_ARRAY_SIZE, STREAM_INDEX_ARRAY_SIZE) +
-    sizeof(STREAM_TYPE) * STREAM_INDEX_ARRAY_SIZE +
+    2 * sizeof(STREAM_TYPE) * STREAM_INDEX_ARRAY_SIZE +
     sizeof(INDEX_TYPE) * STREAM_INDEX_ARRAY_SIZE,
 #endif
 };
@@ -378,19 +376,32 @@ main()
     }
 
 #ifdef PERMUTE_INDEX_ARRAY
-    /* Use the Fisher-Yates Shuffle algorithm
-     * to generate an unbiased random permutation
-     * for the irregular indices. */
+#ifndef PERMUTE_INDEX_ARRAY_STRIDE
+#define PERMUTE_INDEX_ARRAY_STRIDE 1
+#endif
 #ifdef SRAND_SEED
     seed = SRAND_SEED;
 #else
     seed = time(0);
 #endif
     srand(seed);
-    printf("The index array is randomly permuted (seed = %d)\n ",
-           seed);
-    for (j=0; j<STREAM_INDEX_ARRAY_SIZE-2; j++) {
-        int k = j + rand() % (STREAM_INDEX_ARRAY_SIZE - j);
+
+    /* Use a Fisher-Yates Shuffle algorithm
+     * to generate an unbiased random permutation
+     * for the irregular indices.
+     *
+     * Note that if a stride is given via the pre-processor macro
+     * `PERMUTE_INDEX_ARRAY_STRIDE`, then only indices `i[j]` are
+     * permuted if `j` is a multiple of the stride.  In this case,
+     * another index `k`, which must also be a multiple of the stride,
+     * is chosen randomly, and the values `i[j]` and `i[k]` are
+     * swapped.
+     */
+    printf("The index array is randomly permuted (seed = %d, stride = %d)\n ",
+           seed, PERMUTE_INDEX_ARRAY_STRIDE);
+    for (j=0; j<STREAM_INDEX_ARRAY_SIZE-(PERMUTE_INDEX_ARRAY_STRIDE+1); j+=PERMUTE_INDEX_ARRAY_STRIDE) {
+        int k = j + (rand() % ((STREAM_INDEX_ARRAY_SIZE - j) / PERMUTE_INDEX_ARRAY_STRIDE)) *
+            PERMUTE_INDEX_ARRAY_STRIDE;
         INDEX_TYPE tmp = i[j];
         i[j] = i[k];
         i[k] = tmp;
