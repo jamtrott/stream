@@ -47,6 +47,11 @@
 # include <limits.h>
 # include <sys/time.h>
 
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+#include <stdlib.h>
+#include <time.h>
+#endif
+
 /*-----------------------------------------------------------------------
  * INSTRUCTIONS:
  *
@@ -92,6 +97,10 @@
  */
 #ifndef STREAM_ARRAY_SIZE
 #   define STREAM_ARRAY_SIZE	10000000
+#endif
+
+#ifndef STREAM_INDEX_ARRAY_SIZE
+#   define STREAM_INDEX_ARRAY_SIZE	10000000
 #endif
 
 /*  2) STREAM runs each kernel "NTIMES" times and reports the *best* result
@@ -176,26 +185,61 @@
 #define STREAM_TYPE double
 #endif
 
-#ifndef NUM_KERNELS
+#ifndef INDEX_TYPE
+#define INDEX_TYPE int
+#endif
+
+#if !defined(ENABLE_GATHER) && !defined(ENABLE_SCATTER)
 #define NUM_KERNELS 4
+#elif defined(ENABLE_GATHER) && !defined(ENABLE_SCATTER)
+#define NUM_KERNELS 5
+#elif !defined(ENABLE_GATHER) && defined(ENABLE_SCATTER)
+#define NUM_KERNELS 5
+#else
+#define NUM_KERNELS 6
 #endif
 
 static STREAM_TYPE	a[STREAM_ARRAY_SIZE+OFFSET],
     b[STREAM_ARRAY_SIZE+OFFSET],
     c[STREAM_ARRAY_SIZE+OFFSET];
 
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+static STREAM_TYPE	d[STREAM_INDEX_ARRAY_SIZE+OFFSET];
+static INDEX_TYPE       i[STREAM_INDEX_ARRAY_SIZE+OFFSET];
+#endif
+#if defined(ENABLE_SCATTER)
+static STREAM_TYPE      e[STREAM_ARRAY_SIZE+OFFSET];
+#endif
+
 static double	avgtime[NUM_KERNELS] = {0}, maxtime[NUM_KERNELS] = {0},
     mintime[NUM_KERNELS] = {FLT_MAX,FLT_MAX,FLT_MAX,FLT_MAX};
 
 static char	*label[NUM_KERNELS] = {
     "Copy:      ", "Scale:     ",
-    "Add:       ", "Triad:     "};
+    "Add:       ", "Triad:     ",
+#ifdef ENABLE_GATHER
+    "Gather:    ",
+#endif
+#ifdef ENABLE_SCATTER
+    "Scatter:   ",
+#endif
+};
 
 static double	bytes[NUM_KERNELS] = {
     2 * sizeof(STREAM_TYPE) * STREAM_ARRAY_SIZE,
     2 * sizeof(STREAM_TYPE) * STREAM_ARRAY_SIZE,
     3 * sizeof(STREAM_TYPE) * STREAM_ARRAY_SIZE,
-    3 * sizeof(STREAM_TYPE) * STREAM_ARRAY_SIZE
+    3 * sizeof(STREAM_TYPE) * STREAM_ARRAY_SIZE,
+#ifdef ENABLE_GATHER
+    sizeof(STREAM_TYPE) * MIN(STREAM_ARRAY_SIZE, STREAM_INDEX_ARRAY_SIZE) +
+    sizeof(STREAM_TYPE) * STREAM_INDEX_ARRAY_SIZE +
+    sizeof(INDEX_TYPE) * STREAM_INDEX_ARRAY_SIZE,
+#endif
+#ifdef ENABLE_SCATTER
+    sizeof(STREAM_TYPE) * MIN(STREAM_ARRAY_SIZE, STREAM_INDEX_ARRAY_SIZE) +
+    sizeof(STREAM_TYPE) * STREAM_INDEX_ARRAY_SIZE +
+    sizeof(INDEX_TYPE) * STREAM_INDEX_ARRAY_SIZE,
+#endif
 };
 
 extern double mysecond();
@@ -214,6 +258,13 @@ main()
 {
     int			quantum, checktick();
     int			BytesPerWord;
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+    int			BytesPerIndexWord;
+    unsigned int	seed;
+#endif
+#if NUM_KERNELS > 4
+    int			l;
+#endif
     int			k;
     ssize_t		j;
     STREAM_TYPE		scalar;
@@ -227,6 +278,19 @@ main()
     BytesPerWord = sizeof(STREAM_TYPE);
     printf("This system uses %d bytes per array element.\n",
            BytesPerWord);
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+    BytesPerIndexWord = sizeof(INDEX_TYPE);
+    printf("Also, this system uses %d bytes per array index.\n",
+           BytesPerIndexWord);
+#endif
+
+#if NUM_KERNELS > 4
+    for (j=0; j<NUM_KERNELS; j++) {
+        avgtime[j] = 0.0;
+        mintime[j] = FLT_MAX;
+        maxtime[j] = 0.0;
+    }
+#endif
 
     printf(HLINE);
 #ifdef N
@@ -241,9 +305,36 @@ main()
     printf("Memory per array = %.1f MiB (= %.1f GiB).\n",
            BytesPerWord * ( (double) STREAM_ARRAY_SIZE / 1024.0/1024.0),
            BytesPerWord * ( (double) STREAM_ARRAY_SIZE / 1024.0/1024.0/1024.0));
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+    printf("Index array size = %llu (elements), Offset = %d (elements)\n" , (unsigned long long) STREAM_INDEX_ARRAY_SIZE, OFFSET);
+    printf("Memory per indexed array = %.1f MiB (= %.1f GiB).\n",
+           BytesPerWord * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024.0),
+           BytesPerWord * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024.0/1024.0));
+    printf("Memory per index array = %.1f MiB (= %.1f GiB).\n",
+           BytesPerIndexWord * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024.0),
+           BytesPerIndexWord * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024.0/1024.0));
+#ifdef ENABLE_SCATTER
+    printf("Total memory required = %.1f MiB (= %.1f GiB).\n",
+           (4.0 * BytesPerWord) * ( (double) STREAM_ARRAY_SIZE / 1024.0/1024.) +
+           (1.0 * BytesPerWord) * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024.) +
+           (1.0 * BytesPerIndexWord) * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024.),
+           (4.0 * BytesPerWord) * ( (double) STREAM_ARRAY_SIZE / 1024.0/1024./1024.) +
+           (1.0 * BytesPerWord) * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024./1024.) +
+           (1.0 * BytesPerIndexWord) * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024./1024.));
+#else
+    printf("Total memory required = %.1f MiB (= %.1f GiB).\n",
+           (3.0 * BytesPerWord) * ( (double) STREAM_ARRAY_SIZE / 1024.0/1024.) +
+           (1.0 * BytesPerWord) * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024.) +
+           (1.0 * BytesPerIndexWord) * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024.),
+           (3.0 * BytesPerWord) * ( (double) STREAM_ARRAY_SIZE / 1024.0/1024./1024.) +
+           (1.0 * BytesPerWord) * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024./1024.) +
+           (1.0 * BytesPerIndexWord) * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024./1024.));
+#endif
+#else
     printf("Total memory required = %.1f MiB (= %.1f GiB).\n",
            (3.0 * BytesPerWord) * ( (double) STREAM_ARRAY_SIZE / 1024.0/1024.),
            (3.0 * BytesPerWord) * ( (double) STREAM_ARRAY_SIZE / 1024.0/1024./1024.));
+#endif
     printf("Each kernel will be executed %d times.\n", NTIMES);
     printf(" The *best* time for each kernel (excluding the first iteration)\n");
     printf(" will be used to compute the reported bandwidth.\n");
@@ -275,6 +366,43 @@ main()
         b[j] = 2.0;
         c[j] = 0.0;
     }
+
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+#pragma omp parallel for
+    for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++) {
+        d[j] = 0.0;
+    }
+#pragma omp parallel for
+    for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++) {
+        i[j] = j % STREAM_ARRAY_SIZE;
+    }
+
+#ifdef PERMUTE_INDEX_ARRAY
+    /* Use the Fisher-Yates Shuffle algorithm
+     * to generate an unbiased random permutation
+     * for the irregular indices. */
+#ifdef SRAND_SEED
+    seed = SRAND_SEED;
+#else
+    seed = time(0);
+#endif
+    srand(seed);
+    printf("The index array is randomly permuted (seed = %d)\n ",
+           seed);
+    for (j=0; j<STREAM_INDEX_ARRAY_SIZE-2; j++) {
+        int k = j + rand() % (STREAM_INDEX_ARRAY_SIZE - j);
+        INDEX_TYPE tmp = i[j];
+        i[j] = i[k];
+        i[k] = tmp;
+    }
+#endif
+#endif
+#ifdef ENABLE_SCATTER
+#pragma omp parallel for
+    for (j=0; j<STREAM_ARRAY_SIZE; j++) {
+        e[j] = 0.0;
+    }
+#endif
 
     printf(HLINE);
 
@@ -350,6 +478,26 @@ main()
             a[j] = b[j]+scalar*c[j];
 #endif
         times[3][k] = mysecond() - times[3][k];
+
+#if NUM_KERNELS > 4
+        l = 4;
+#endif
+#ifdef ENABLE_GATHER
+        times[l][k] = mysecond();
+#pragma omp parallel for
+        for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++)
+            d[j] = a[i[j]];
+        times[l][k] = mysecond() - times[l][k];
+        l++;
+#endif
+#ifdef ENABLE_SCATTER
+        times[l][k] = mysecond();
+#pragma omp parallel for
+        for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++)
+            e[i[j]] = d[j];
+        times[l][k] = mysecond() - times[l][k];
+        l++;
+#endif
     }
 
     /*	--- SUMMARY --- */
@@ -450,6 +598,12 @@ void checkSTREAMresults ()
     STREAM_TYPE aj,bj,cj,scalar;
     STREAM_TYPE aSumErr,bSumErr,cSumErr;
     STREAM_TYPE aAvgErr,bAvgErr,cAvgErr;
+#ifdef ENABLE_GATHER
+    STREAM_TYPE dj,dSumErr,dAvgErr;
+#endif
+#ifdef ENABLE_SCATTER
+    STREAM_TYPE ej,eSumErr,eAvgErr;
+#endif
     double epsilon;
     ssize_t	j;
     int	k,ierr,err;
@@ -468,6 +622,16 @@ void checkSTREAMresults ()
         bj = scalar*cj;
         cj = aj+bj;
         aj = bj+scalar*cj;
+#ifdef ENABLE_GATHER
+        dj = aj;
+#endif
+#ifdef ENABLE_SCATTER
+#ifdef ENABLE_GATHER
+        ej = aj;
+#else
+        ej = 0.0;
+#endif
+#endif
     }
 
     /* accumulate deltas between observed and expected results */
@@ -483,6 +647,21 @@ void checkSTREAMresults ()
     aAvgErr = aSumErr / (STREAM_TYPE) STREAM_ARRAY_SIZE;
     bAvgErr = bSumErr / (STREAM_TYPE) STREAM_ARRAY_SIZE;
     cAvgErr = cSumErr / (STREAM_TYPE) STREAM_ARRAY_SIZE;
+
+#ifdef ENABLE_GATHER
+    dSumErr = 0.0;
+    for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++) {
+        dSumErr += abs(d[j] - dj);
+    }
+    dAvgErr = dSumErr / (STREAM_TYPE) STREAM_INDEX_ARRAY_SIZE;
+#endif
+#ifdef ENABLE_SCATTER
+    eSumErr = 0.0;
+    for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++) {
+        eSumErr += abs(e[i[j]] - ej);
+    }
+    eAvgErr = eSumErr / (STREAM_TYPE) STREAM_ARRAY_SIZE;
+#endif
 
     if (sizeof(STREAM_TYPE) == 4) {
         epsilon = 1.e-6;
@@ -552,6 +731,48 @@ void checkSTREAMresults ()
         }
         printf("     For array c[], %d errors were found.\n",ierr);
     }
+#ifdef ENABLE_GATHER
+    if (abs(dAvgErr/dj) > epsilon) {
+        err++;
+        printf ("Failed Validation on array d[], AvgRelAbsErr > epsilon (%e)\n",epsilon);
+        printf ("     Expected Value: %e, AvgAbsErr: %e, AvgRelAbsErr: %e\n",dj,dAvgErr,abs(dAvgErr)/dj);
+        printf ("     AvgRelAbsErr > Epsilon (%e)\n",epsilon);
+        ierr = 0;
+        for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++) {
+            if (abs(d[j]/dj-1.0) > epsilon) {
+                ierr++;
+#ifdef VERBOSE
+                if (ierr < 10) {
+                    printf("         array d: index: %ld, expected: %e, observed: %e, relative error: %e\n",
+                           j,dj,d[j],abs((dj-d[j])/dAvgErr));
+                }
+#endif
+            }
+        }
+        printf("     For array d[], %d errors were found.\n",ierr);
+    }
+#endif
+#ifdef ENABLE_SCATTER
+    if (abs(eAvgErr/ej) > epsilon) {
+        err++;
+        printf ("Failed Validation on array e[], AvgRelAbsErr > epsilon (%e)\n",epsilon);
+        printf ("     Expected Value: %e, AvgAbsErr: %e, AvgRelAbsErr: %e\n",ej,eAvgErr,abs(eAvgErr)/ej);
+        printf ("     AvgRelAbsErr > Epsilon (%e)\n",epsilon);
+        ierr = 0;
+        for (j=0; j<STREAM_ARRAY_SIZE; j++) {
+            if (abs(e[j]/ej-1.0) > epsilon) {
+                ierr++;
+#ifdef VERBOSE
+                if (ierr < 10) {
+                    printf("         array e: index: %ld, expected: %e, observed: %e, relative error: %e\n",
+                           j,ej,e[j],abs((ej-e[j])/eAvgErr));
+                }
+#endif
+            }
+        }
+        printf("     For array e[], %d errors were found.\n",ierr);
+    }
+#endif
     if (err == 0) {
         printf ("Solution Validates: avg error less than %e on all three arrays\n",epsilon);
     }
