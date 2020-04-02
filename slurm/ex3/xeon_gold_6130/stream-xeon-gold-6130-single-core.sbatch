@@ -35,7 +35,7 @@ function main ()
     fi
 
     # Create a temporary working directory
-    workdir="$(mktemp -d ${job_id}-${job_name}-XXXX)"
+    workdir="$(mktemp --tmpdir -d ${job_id}-${job_name}-XXXX)"
 
     # Set up the compiler flags for each benchmark run
     local configurations=(

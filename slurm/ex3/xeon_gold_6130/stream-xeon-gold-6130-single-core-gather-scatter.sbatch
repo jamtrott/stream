@@ -19,7 +19,8 @@ set -o errexit
 ## Suggested configuration:
 ##   1. Set STREAM_DIR to point to the STREAM source directory
 ##   2. Set TMPDIR=/work/${USER}/tmp
-##   3. Set CFLAGS="-march=skylake-avx512 -O3 -funroll-loops -fno-builtin"
+##   3. Set CC=gcc
+##   4. Set CFLAGS="-march=skylake-avx512 -O3 -funroll-loops -fno-builtin"
 ##
 function main ()
 {
@@ -34,7 +35,7 @@ function main ()
     fi
 
     # Create a temporary working directory and copy the source code
-    workdir="$(mktemp -d ${job_id}-${job_name}-XXXX)"
+    workdir="$(mktemp --tmpdir -d ${job_id}-${job_name}-XXXX)"
 
     # Set up the compiler flags for each benchmark run
     local configurations=(
