@@ -201,21 +201,31 @@
 #define NUM_KERNELS_SCATTER 0
 #endif
 
+#if defined(ENABLE_INDIRECT_DOT_PRODUCT)
+#define NUM_KERNELS_INDIRECT_DOT_PRODUCT 1
+#else
+#define NUM_KERNELS_INDIRECT_DOT_PRODUCT 0
+#endif
+
 #define NUM_KERNELS                             \
     (4 +                                        \
      NUM_KERNELS_GATHER +                       \
-     NUM_KERNELS_SCATTER)
+     NUM_KERNELS_SCATTER +                      \
+     NUM_KERNELS_INDIRECT_DOT_PRODUCT)
 
 static STREAM_TYPE	a[STREAM_ARRAY_SIZE+OFFSET],
     b[STREAM_ARRAY_SIZE+OFFSET],
     c[STREAM_ARRAY_SIZE+OFFSET];
 
-#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER) || defined(ENABLE_INDIRECT_DOT_PRODUCT)
 static STREAM_TYPE	d[STREAM_INDEX_ARRAY_SIZE+OFFSET];
 static INDEX_TYPE       i[STREAM_INDEX_ARRAY_SIZE+OFFSET];
 #endif
 #if defined(ENABLE_SCATTER)
 static STREAM_TYPE      e[STREAM_ARRAY_SIZE+OFFSET];
+#endif
+#if defined(ENABLE_INDIRECT_DOT_PRODUCT)
+static STREAM_TYPE x;
 #endif
 
 static double	avgtime[NUM_KERNELS] = {0}, maxtime[NUM_KERNELS] = {0},
@@ -230,6 +240,9 @@ static char	*label[NUM_KERNELS] = {
 #ifdef ENABLE_SCATTER
     "Scatter:   ",
 #endif
+#ifdef ENABLE_INDIRECT_DOT_PRODUCT
+    "Ind.dot:   ",
+#endif
 };
 
 static double	bytes[NUM_KERNELS] = {
@@ -243,6 +256,11 @@ static double	bytes[NUM_KERNELS] = {
     sizeof(INDEX_TYPE) * STREAM_INDEX_ARRAY_SIZE,
 #endif
 #ifdef ENABLE_SCATTER
+    sizeof(STREAM_TYPE) * MIN(STREAM_ARRAY_SIZE, STREAM_INDEX_ARRAY_SIZE) +
+    sizeof(STREAM_TYPE) * STREAM_INDEX_ARRAY_SIZE +
+    sizeof(INDEX_TYPE) * STREAM_INDEX_ARRAY_SIZE,
+#endif
+#ifdef ENABLE_INDIRECT_DOT_PRODUCT
     sizeof(STREAM_TYPE) * MIN(STREAM_ARRAY_SIZE, STREAM_INDEX_ARRAY_SIZE) +
     sizeof(STREAM_TYPE) * STREAM_INDEX_ARRAY_SIZE +
     sizeof(INDEX_TYPE) * STREAM_INDEX_ARRAY_SIZE,
@@ -265,7 +283,7 @@ main()
 {
     int			quantum, checktick();
     int			BytesPerWord;
-#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER) || defined(ENABLE_INDIRECT_DOT_PRODUCT)
     int			BytesPerIndexWord;
     unsigned int	seed;
 #endif
@@ -285,7 +303,7 @@ main()
     BytesPerWord = sizeof(STREAM_TYPE);
     printf("This system uses %d bytes per array element.\n",
            BytesPerWord);
-#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER) || defined(ENABLE_INDIRECT_DOT_PRODUCT)
     BytesPerIndexWord = sizeof(INDEX_TYPE);
     printf("Also, this system uses %d bytes per array index.\n",
            BytesPerIndexWord);
@@ -312,7 +330,7 @@ main()
     printf("Memory per array = %.1f MiB (= %.1f GiB).\n",
            BytesPerWord * ( (double) STREAM_ARRAY_SIZE / 1024.0/1024.0),
            BytesPerWord * ( (double) STREAM_ARRAY_SIZE / 1024.0/1024.0/1024.0));
-#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER) || defined(ENABLE_INDIRECT_DOT_PRODUCT)
     printf("Index array size = %llu (elements), Offset = %d (elements)\n" , (unsigned long long) STREAM_INDEX_ARRAY_SIZE, OFFSET);
     printf("Memory per indexed array = %.1f MiB (= %.1f GiB).\n",
            BytesPerWord * ( (double) STREAM_INDEX_ARRAY_SIZE / 1024.0/1024.0),
@@ -374,10 +392,10 @@ main()
         c[j] = 0.0;
     }
 
-#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER)
+#if defined(ENABLE_GATHER) || defined(ENABLE_SCATTER) || defined(ENABLE_INDIRECT_DOT_PRODUCT)
 #pragma omp parallel for
     for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++) {
-        d[j] = 0.0;
+        d[j] = 1.0;
     }
 #pragma omp parallel for
     for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++) {
@@ -505,6 +523,15 @@ main()
         times[l][k] = mysecond() - times[l][k];
         l++;
 #endif
+#ifdef ENABLE_INDIRECT_DOT_PRODUCT
+        x = 0.0;
+        times[l][k] = mysecond();
+#pragma omp parallel for
+        for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++)
+            x += d[j] * b[i[j]];
+        times[l][k] = mysecond() - times[l][k];
+        l++;
+#endif
     }
 
     /*	--- SUMMARY --- */
@@ -611,6 +638,9 @@ void checkSTREAMresults ()
 #ifdef ENABLE_SCATTER
     STREAM_TYPE ej,eSumErr,eAvgErr;
 #endif
+#ifdef ENABLE_INDIRECT_DOT_PRODUCT
+    STREAM_TYPE xj,xErr;
+#endif
     double epsilon;
     ssize_t	j;
     int	k,ierr,err;
@@ -668,6 +698,12 @@ void checkSTREAMresults ()
         eSumErr += abs(e[i[j]] - ej);
     }
     eAvgErr = eSumErr / (STREAM_TYPE) STREAM_ARRAY_SIZE;
+#endif
+#ifdef ENABLE_INDIRECT_DOT_PRODUCT
+    xj = 0.0;
+    for (j=0; j<STREAM_INDEX_ARRAY_SIZE; j++)
+        xj += d[j] * b[i[j]];
+    xErr = x - xj;
 #endif
 
     if (sizeof(STREAM_TYPE) == 4) {
@@ -778,6 +814,14 @@ void checkSTREAMresults ()
             }
         }
         printf("     For array e[], %d errors were found.\n",ierr);
+    }
+#endif
+#ifdef ENABLE_INDIRECT_DOT_PRODUCT
+    if (abs(xErr/xj) > epsilon) {
+        err++;
+        printf ("Failed Validation on value x, AvgRelAbsErr > epsilon (%e)\n",epsilon);
+        printf ("     Expected Value: %e, AvgAbsErr: %e, AvgRelAbsErr: %e\n",xj,xErr,abs(xErr)/xj);
+        printf ("     AvgRelAbsErr > Epsilon (%e)\n",epsilon);
     }
 #endif
     if (err == 0) {
