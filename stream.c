@@ -189,15 +189,22 @@
 #define INDEX_TYPE int
 #endif
 
-#if !defined(ENABLE_GATHER) && !defined(ENABLE_SCATTER)
-#define NUM_KERNELS 4
-#elif defined(ENABLE_GATHER) && !defined(ENABLE_SCATTER)
-#define NUM_KERNELS 5
-#elif !defined(ENABLE_GATHER) && defined(ENABLE_SCATTER)
-#define NUM_KERNELS 5
+#if defined(ENABLE_GATHER)
+#define NUM_KERNELS_GATHER 1
 #else
-#define NUM_KERNELS 6
+#define NUM_KERNELS_GATHER 0
 #endif
+
+#if defined(ENABLE_SCATTER)
+#define NUM_KERNELS_SCATTER 1
+#else
+#define NUM_KERNELS_SCATTER 0
+#endif
+
+#define NUM_KERNELS                             \
+    (4 +                                        \
+     NUM_KERNELS_GATHER +                       \
+     NUM_KERNELS_SCATTER)
 
 static STREAM_TYPE	a[STREAM_ARRAY_SIZE+OFFSET],
     b[STREAM_ARRAY_SIZE+OFFSET],
