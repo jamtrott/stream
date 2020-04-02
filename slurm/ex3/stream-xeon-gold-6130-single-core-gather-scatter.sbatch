@@ -67,7 +67,7 @@ main ()
 
     # Compile and run the benchmark
     for i in "${!configurations[@]}"; do
-        local STREAM_CFLAGS="${configurations[${i}]}"
+	local STREAM_CFLAGS="${configurations[${i}]}"
 	local stream="${workdir}/stream"
 	set -x
 	${CC} ${CFLAGS} ${STREAM_CFLAGS} "${workdir}/stream.c" -o "${stream}"
