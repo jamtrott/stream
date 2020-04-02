@@ -26,11 +26,18 @@ function main ()
 {
     local job_id="${SLURM_JOB_ID:-0}"
     local job_name="${SLURM_JOB_NAME:-0}"
+    local job_host="${SLURM_SUBMIT_HOST}"
+    local job_nodelist="${SLURM_JOB_NODELIST}"
+
+    echo "SLURM_JOB_NAME=${SLURM_JOB_NAME}" >&2
+    echo "SLURM_JOB_ID=${SLURM_JOB_ID}" >&2
+    echo "SLURM_SUBMIT_HOST=${SLURM_SUBMIT_HOST}" >&2
+    echo "SLURM_JOB_NODELIST=${SLURM_JOB_NODELIST}" >&2
 
     # Use the environment variable STREAM_DIR to find the location of
     # the STREAM benchmark.
     if [[ ! -d "${STREAM_DIR}" ]]; then
-	printf "Please set STREAM_DIR to specify the location of the source code for the STREAM benchmark.\n"
+	printf "Please set STREAM_DIR to specify the location of the source code for the STREAM benchmark.\n" >&2
 	exit 1
     fi
 
