@@ -19,9 +19,10 @@ set -o errexit
 ## Suggested configuration:
 ##   1. Set STREAM_DIR to point to the STREAM source directory
 ##   2. Set TMPDIR=/work/${USER}/tmp
-##   3. Set CFLAGS="-march=skylake-avx512 -O3 -funroll-loops -fno-builtin"
+##   3. Set CC=gcc
+##   4. Set CFLAGS="-march=skylake-avx512 -O3 -funroll-loops -fno-builtin"
 ##
-main ()
+function main ()
 {
     local job_id="${SLURM_JOB_ID:-0}"
     local job_name="${SLURM_JOB_NAME:-0}"
@@ -33,17 +34,8 @@ main ()
 	exit 1
     fi
 
-    # Create a working directory
-    workdir="${TMPDIR}/${job_id}-${job_name}"
-    if [[ -d "${workdir}" ]]; then
-	printf "The working directory ${workdir} already exists!\n"
-	exit 1
-    fi
-    mkdir -p "${workdir}"
-
-    # Copy the source code
-    mkdir -p "${workdir}"
-    cp -r -T "${STREAM_DIR}" "${workdir}"
+    # Create a temporary working directory
+    workdir="$(mktemp -d ${job_id}-${job_name}-XXXX)"
 
     # Set up the compiler flags for each benchmark run
     local configurations=(
@@ -68,9 +60,9 @@ main ()
     # Compile and run the benchmark
     for i in "${!configurations[@]}"; do
 	local STREAM_CFLAGS="${configurations[${i}]}"
-	local stream="${workdir}/stream"
+	local stream="${workdir}/stream-$(printf '%03d' ${i})"
 	set -x
-	${CC} ${CFLAGS} ${STREAM_CFLAGS} "${workdir}/stream.c" -o "${stream}"
+	${CC} ${CFLAGS} ${STREAM_CFLAGS} "${STREAM_DIR}/stream.c" -o "${stream}"
 	numactl --physcpubind=0 --membind=0 ${stream}
 	{ set +x; } 2>/dev/null
     done
