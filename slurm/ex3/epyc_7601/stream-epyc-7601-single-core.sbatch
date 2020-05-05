@@ -45,32 +45,67 @@ function main ()
     workdir="$(mktemp --tmpdir -d ${job_id}-${job_name}-XXXX)"
 
     # Set up the compiler flags for each benchmark run
-    local configurations=(
-	"-DSTREAM_ARRAY_SIZE=$((1*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((2*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((4*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((8*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((16*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((32*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((64*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((128*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((256*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((512*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((1*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((2*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((4*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((8*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((16*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((32*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((64*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME")
+    local stream_compiler_flags=(
+	"-DSTREAM_ARRAY_SIZE=1024 -DNTIMES=2000000 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=8192 -DNTIMES=10000 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=200000ull -DNTIMES=100 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME")
+
+    local stream_environment_variables=(
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=4 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=4 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=4 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=8 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=8 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=8 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=32 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=32 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=64 OMP_PROC_BIND=close OMP_PLACES=cores")
+
+    local stream_numactl_options=(
+	"--physcpubind=0 --membind=0"
+	"--physcpubind=0 --membind=0"
+	"--physcpubind=0 --membind=0"
+	"--physcpubind=0 --membind=0"
+	"--physcpubind=0 --membind=1"
+	"--physcpubind=0 --membind=4"
+	"--physcpubind=0-3 --membind=0"
+	"--physcpubind=0-3 --membind=1"
+	"--physcpubind=0-3 --membind=4"
+	"--physcpubind=0-7 --membind=0"
+	"--physcpubind=0-7 --membind=1"
+	"--physcpubind=0-7 --membind=4"
+	"--physcpubind=0-31 --membind=0-3"
+	"--physcpubind=0-31 --membind=4-7"
+	"--physcpubind=0-63 --membind=0-7")
 
     # Compile and run the benchmark
-    for i in "${!configurations[@]}"; do
-	local STREAM_CFLAGS="${configurations[${i}]}"
+    for i in "${!stream_compiler_flags[@]}"; do
+	local STREAM_CFLAGS="${stream_compiler_flags[${i}]}"
+	local numactl_options="${numactl_options[${i}]}"
 	local stream="${workdir}/stream-$(printf '%03d' ${i})"
 	set -x
 	${CC} ${CFLAGS} ${STREAM_CFLAGS} "${STREAM_DIR}/stream.c" -o "${stream}"
-	numactl --physcpubind=0 --membind=0 ${stream}
+	(export ${stream_environment_variables[${i}]}; \
+	 numactl ${stream_numactl_options[${i}]} \
+		 ${stream})
 	{ set +x; } 2>/dev/null
     done
 }
