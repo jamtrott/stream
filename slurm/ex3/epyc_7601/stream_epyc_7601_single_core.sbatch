@@ -1,8 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name="stream-epyc-7601-single-core"
+#SBATCH --job-name="stream_epyc_7601_single_core"
 #SBATCH --partition=defq
 #SBATCH --time=0-01:00:00
 #SBATCH --nodes=1
+#SBATCH --nodelist=n004
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --exclusive
@@ -20,7 +21,7 @@ set -o errexit
 ##   1. Set STREAM_DIR to point to the STREAM source directory
 ##   2. Set TMPDIR=/work/${USER}/tmp
 ##   3. Set CC=gcc
-##   4. Set CFLAGS="-march=skylake-avx512 -O3 -funroll-loops -fno-builtin"
+##   4. Set CFLAGS="-march=znver1 -O3 -funroll-loops -fno-builtin"
 ##
 function main ()
 {
@@ -46,9 +47,7 @@ function main ()
 
     # Set up the compiler flags for each benchmark run
     local stream_compiler_flags=(
-	"-DSTREAM_ARRAY_SIZE=1024 -DNTIMES=2000000 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=8192 -DNTIMES=10000 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=200000ull -DNTIMES=100 -DUSE_CLOCK_GETTIME"
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
 	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
 	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
 	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
@@ -69,32 +68,28 @@ function main ()
 	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
 	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
 	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
-	"OMP_NUM_THREADS=4 OMP_PROC_BIND=close OMP_PLACES=cores"
-	"OMP_NUM_THREADS=4 OMP_PROC_BIND=close OMP_PLACES=cores"
-	"OMP_NUM_THREADS=4 OMP_PROC_BIND=close OMP_PLACES=cores"
-	"OMP_NUM_THREADS=8 OMP_PROC_BIND=close OMP_PLACES=cores"
-	"OMP_NUM_THREADS=8 OMP_PROC_BIND=close OMP_PLACES=cores"
-	"OMP_NUM_THREADS=8 OMP_PROC_BIND=close OMP_PLACES=cores"
-	"OMP_NUM_THREADS=32 OMP_PROC_BIND=close OMP_PLACES=cores"
-	"OMP_NUM_THREADS=32 OMP_PROC_BIND=close OMP_PLACES=cores"
-	"OMP_NUM_THREADS=64 OMP_PROC_BIND=close OMP_PLACES=cores")
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores"
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores")
 
     local stream_numactl_options=(
 	"--physcpubind=0 --membind=0"
-	"--physcpubind=0 --membind=0"
-	"--physcpubind=0 --membind=0"
-	"--physcpubind=0 --membind=0"
 	"--physcpubind=0 --membind=1"
-	"--physcpubind=0 --membind=4"
-	"--physcpubind=0-3 --membind=0"
-	"--physcpubind=0-3 --membind=1"
-	"--physcpubind=0-3 --membind=4"
-	"--physcpubind=0-7 --membind=0"
-	"--physcpubind=0-7 --membind=1"
-	"--physcpubind=0-7 --membind=4"
-	"--physcpubind=0-31 --membind=0-3"
-	"--physcpubind=0-31 --membind=4-7"
-	"--physcpubind=0-63 --membind=0-7")
+	"--physcpubind=0 --membind=2"
+	"--physcpubind=0 --membind=3"
+	"--physcpubind=0 --membind=0,1"
+	"--physcpubind=0 --membind=0,2"
+	"--physcpubind=0 --membind=0,3"
+	"--physcpubind=0 --membind=1,2"
+	"--physcpubind=0 --membind=1,3"
+	"--physcpubind=0 --membind=2,3"
+	"--physcpubind=0 --membind=0,1,2"
+	"--physcpubind=0 --membind=0,2,3"
+	"--physcpubind=0 --membind=1,2,3")
 
     # Compile and run the benchmark
     for i in "${!stream_compiler_flags[@]}"; do
