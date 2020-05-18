@@ -3,6 +3,7 @@
 #SBATCH --partition=xeongold16q
 #SBATCH --time=0-01:00:00
 #SBATCH --nodes=1
+#SBATCH --nodelist=srl-adm2
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --exclusive
@@ -20,7 +21,7 @@ set -o errexit
 ##   1. Set STREAM_DIR to point to the STREAM source directory
 ##   2. Set TMPDIR=/work/${USER}/tmp
 ##   3. Set CC=gcc
-##   4. Set CFLAGS="-march=skylake-avx512 -O3 -funroll-loops -fno-builtin"
+##   4. Set CFLAGS="-march=native -O3 -funroll-loops -fno-builtin"
 ##
 function main ()
 {
@@ -45,32 +46,25 @@ function main ()
     workdir="$(mktemp --tmpdir -d ${job_id}-${job_name}-XXXX)"
 
     # Set up the compiler flags for each benchmark run
-    local configurations=(
-	"-DSTREAM_ARRAY_SIZE=$((1*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((2*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((4*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((8*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((16*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((32*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((64*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((128*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((256*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((512*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((1*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((2*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((4*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((8*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((16*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((32*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-	"-DSTREAM_ARRAY_SIZE=$((64*1024*1024)) -DNTIMES=10 -DUSE_CLOCK_GETTIME")
+    local stream_compiler_flags=(
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME")
+
+    local stream_environment_variables=(
+	"OMP_NUM_THREADS=1 OMP_PROC_BIND=close OMP_PLACES=cores")
+
+    local stream_numactl_options=(
+	"--physcpubind=0 --membind=0")
 
     # Compile and run the benchmark
-    for i in "${!configurations[@]}"; do
-	local STREAM_CFLAGS="${configurations[${i}]}"
+    for i in "${!stream_compiler_flags[@]}"; do
+	local STREAM_CFLAGS="${stream_compiler_flags[${i}]}"
+	local numactl_options="${numactl_options[${i}]}"
 	local stream="${workdir}/stream-$(printf '%03d' ${i})"
 	set -x
 	${CC} ${CFLAGS} ${STREAM_CFLAGS} "${STREAM_DIR}/stream.c" -o "${stream}"
-	numactl --physcpubind=0 --membind=0 ${stream}
+	(export ${stream_environment_variables[${i}]}; \
+	 numactl ${stream_numactl_options[${i}]} \
+		 ${stream})
 	{ set +x; } 2>/dev/null
     done
 }
