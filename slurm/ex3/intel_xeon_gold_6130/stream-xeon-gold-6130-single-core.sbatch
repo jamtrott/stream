@@ -33,6 +33,10 @@ function main ()
     echo "SLURM_JOB_ID=${SLURM_JOB_ID}" >&2
     echo "SLURM_SUBMIT_HOST=${SLURM_SUBMIT_HOST}" >&2
     echo "SLURM_JOB_NODELIST=${SLURM_JOB_NODELIST}" >&2
+    echo "STREAM_DIR=${STREAM_DIR}" >&2
+    echo "TMPDIR=${TMPDIR}" >&2
+    echo "CC=${CC}" >&2
+    echo "CFLAGS=${CFLAGS}" >&2
 
     # Use the environment variable STREAM_DIR to find the location of
     # the STREAM benchmark.
