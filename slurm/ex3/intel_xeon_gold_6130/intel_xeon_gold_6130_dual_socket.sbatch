@@ -46,6 +46,12 @@ function main ()
 	exit 1
     fi
 
+    # Use the environment variable CC to invoke the compiler
+    if [[ -z "${CC}" ]]; then
+	printf "Please set CC to specify which C compiler to use.\n" >&2
+	exit 1
+    fi
+
     # Create a temporary working directory
     workdir="$(mktemp --tmpdir -d ${job_id}-${job_name}-XXXX)"
 
