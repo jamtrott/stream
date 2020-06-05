@@ -3,7 +3,7 @@
 #SBATCH --partition=rome16q
 #SBATCH --time=0-01:00:00
 #SBATCH --nodes=1
-#SBATCH --nodelist=n049
+#SBATCH --nodelist=n051
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
 #SBATCH --exclusive
@@ -66,7 +66,7 @@ function main ()
 	"OMP_NUM_THREADS=16 OMP_PROC_BIND=close OMP_PLACES=cores")
 
     local stream_numactl_options=(
-	"--physcpubind=0-15 --membind=0")
+	"--physcpubind=0-15 --membind=0-3")
 
     # Compile and run the benchmark
     for i in "${!stream_compiler_flags[@]}"; do

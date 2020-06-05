@@ -3,7 +3,7 @@
 #SBATCH --partition=rome16q
 #SBATCH --time=0-01:00:00
 #SBATCH --nodes=1
-#SBATCH --nodelist=n049
+#SBATCH --nodelist=n051
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --exclusive
