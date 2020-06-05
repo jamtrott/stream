@@ -57,10 +57,10 @@ function main ()
 
     # Set up the compiler flags for each benchmark run
     local stream_compiler_flags=(
-    	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME")
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME")
 
     local stream_environment_variables=(
-    	"OMP_NUM_THREADS=32 OMP_PROC_BIND=close OMP_PLACES=cores")
+	"OMP_NUM_THREADS=32 OMP_PROC_BIND=close OMP_PLACES=cores")
 
     local stream_numactl_options=(
 	"--physcpubind=0-31")

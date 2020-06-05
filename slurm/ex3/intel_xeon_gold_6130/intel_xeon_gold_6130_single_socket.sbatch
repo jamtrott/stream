@@ -59,17 +59,17 @@ function main ()
     local stream_compiler_flags=(
 	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
 	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME"
-    	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME")
+	"-DSTREAM_ARRAY_SIZE=80000000ull -DNTIMES=10 -DUSE_CLOCK_GETTIME")
 
     local stream_environment_variables=(
 	"OMP_NUM_THREADS=16 OMP_PROC_BIND=close OMP_PLACES=cores"
 	"OMP_NUM_THREADS=16 OMP_PROC_BIND=close OMP_PLACES=cores"
-    	"OMP_NUM_THREADS=16 OMP_PROC_BIND=close OMP_PLACES=cores")
+	"OMP_NUM_THREADS=16 OMP_PROC_BIND=close OMP_PLACES=cores")
 
     local stream_numactl_options=(
 	"--physcpubind=0-15"
 	"--physcpubind=0-3,8-11,4-7,12-15"
-    	"--physcpubind=16-31")
+	"--physcpubind=16-31")
 
     # Compile and run the benchmark
     for i in "${!stream_compiler_flags[@]}"; do
