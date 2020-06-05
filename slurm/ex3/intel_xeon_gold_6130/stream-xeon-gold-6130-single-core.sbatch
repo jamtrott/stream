@@ -37,6 +37,8 @@ function main ()
     echo "TMPDIR=${TMPDIR}" >&2
     echo "CC=${CC}" >&2
     echo "CFLAGS=${CFLAGS}" >&2
+    uname -a >&2
+    lscpu >&2
 
     # Use the environment variable STREAM_DIR to find the location of
     # the STREAM benchmark.
